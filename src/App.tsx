@@ -51,57 +51,62 @@ export default function App() {
 
   // 1. Firebase Authentication Listener
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (u) => {
-      setAuthLoading(true);
-      if (u) {
-        setFirebaseUser(u);
-        
-        // Listen to User Profile changes
-        const unsubProfile = onSnapshot(
-          doc(db, 'users', u.uid),
-          async (docSnap) => {
-            if (docSnap.exists()) {
-              setUserProfile(docSnap.data() as UserProfile);
-            } else {
-              // Safe fallback profile bootstrap
-              const initialProfile: UserProfile = {
-                userId: u.uid,
-                name: u.displayName || 'Hamba Allah',
-                email: u.email || '',
-                joinedAt: new Date().toISOString(),
-                currentGroupId: null
-              };
-              try {
-                await setDoc(doc(db, 'users', u.uid), initialProfile, { merge: true });
-                setUserProfile(initialProfile);
-              } catch (err) {
-                handleFirestoreError(err, OperationType.WRITE, `users/${u.uid}`);
-              }
-            }
-          },
-          (err) => {
-            handleFirestoreError(err, OperationType.GET, `users/${u.uid}`);
-          }
-        );
-
-        setAuthLoading(false);
-        return () => unsubProfile();
-      } else {
-        setFirebaseUser(null);
-        setUserProfile(null);
-        setTargets([]);
-        setActivities([]);
-        setIncomingNudges([]);
-        setAuthLoading(false);
-      }
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setFirebaseUser(u);
+      setAuthLoading(false);
     });
 
     return () => unsubAuth();
   }, []);
 
-  // 2. Real-time Worship Targets, Activities & Nudges snapshot subscriptions
+  // 2. Real-time User Profile Listener
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (!firebaseUser) {
+      setUserProfile(null);
+      return;
+    }
+
+    const uid = firebaseUser.uid;
+    const unsubProfile = onSnapshot(
+      doc(db, 'users', uid),
+      async (docSnap) => {
+        if (docSnap.exists()) {
+          setUserProfile(docSnap.data() as UserProfile);
+        } else {
+          // Safe fallback profile bootstrap
+          const initialProfile: UserProfile = {
+            userId: uid,
+            name: firebaseUser.displayName || 'Hamba Allah',
+            email: firebaseUser.email || '',
+            joinedAt: new Date().toISOString(),
+            currentGroupId: null
+          };
+          try {
+            await setDoc(doc(db, 'users', uid), initialProfile, { merge: true });
+            setUserProfile(initialProfile);
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
+          }
+        }
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.GET, `users/${uid}`);
+      }
+    );
+
+    return () => {
+      unsubProfile();
+    };
+  }, [firebaseUser]);
+
+  // 3. Real-time Worship Targets, Activities & Nudges snapshot subscriptions
+  useEffect(() => {
+    if (!firebaseUser) {
+      setTargets([]);
+      setActivities([]);
+      setIncomingNudges([]);
+      return;
+    }
 
     const uid = firebaseUser.uid;
     startAction();
