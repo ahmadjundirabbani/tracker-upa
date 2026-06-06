@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloudfirestore {
+  match /databases/{database}/documents {
+
+    // Default-deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    // --- 1. User Profile Rules ---
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) 
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 100
+        && request.resource.data.joinedAt is string;
+      allow update: if isOwner(userId)
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.email == resource.data.email // Email is immutable
+        && request.resource.data.joinedAt == resource.data.joinedAt; // Immutable joined date
+    }
+
+    // --- 2. Worship Targets Rules ---
+    match /users/{userId}/targets/{targetId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+        && request.resource.data.id == targetId
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.metric is string && request.resource.data.metric.size() > 0 && request.resource.data.metric.size() <= 50
+        && request.resource.data.targetValue is number && request.resource.data.targetValue >= 0
+        && (request.resource.data.frequency == 'daily' || request.resource.data.frequency == 'weekly')
+        && request.resource.data.createdAt is string;
+      allow update: if isOwner(userId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.metric is string && request.resource.data.metric.size() > 0 && request.resource.data.metric.size() <= 50
+        && request.resource.data.targetValue is number && request.resource.data.targetValue >= 0
+        && (request.resource.data.frequency == 'daily' || request.resource.data.frequency == 'weekly')
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+    }
+
+    // --- 3. Worship Activity Log Rules ---
+    match /users/{userId}/activities/{activityId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+        && request.resource.data.id == activityId
+        && request.resource.data.userId == userId
+        && request.resource.data.targetId is string
+        && request.resource.data.targetName is string && request.resource.data.targetName.size() > 0
+        && request.resource.data.date is string && request.resource.data.date.size() == 10 // YYYY-MM-DD
+        && request.resource.data.value is number && request.resource.data.value >= 0
+        && request.resource.data.targetValue is number
+        && request.resource.data.metric is string
+        && request.resource.data.completed is boolean
+        && request.resource.data.updatedAt is string;
+      allow update: if isOwner(userId)
+         && request.resource.data.id == resource.data.id
+         && request.resource.data.userId == userId
+         && request.resource.data.targetId == resource.data.targetId
+         && request.resource.data.targetName is string
+         && request.resource.data.date == resource.data.date
+         && request.resource.data.value is number && request.resource.data.value >= 0
+         && request.resource.data.targetValue is number
+         && request.resource.data.metric is string
+         && request.resource.data.completed is boolean
+         && request.resource.data.updatedAt is string;
+      allow delete: if isOwner(userId);
+    }
+
+    // --- 4. Worship Groups Rules ---
+    match /groups/{groupId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.id == groupId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.code is string && request.resource.data.code.size() >= 4 && request.resource.data.code.size() <= 10
+        && request.resource.data.description is string && request.resource.data.description.size() <= 500
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.creatorName is string
+        && request.resource.data.createdAt is string;
+      allow update: if isSignedIn()
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.description is string && request.resource.data.description.size() <= 500;
+    }
+
+    // --- 5. Group Members Subcollection ---
+    match /groups/{groupId}/members/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && request.resource.data.joinedAt is string;
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && request.resource.data.name is string && request.resource.data.name.size() > 0;
+      allow delete: if isSignedIn() && (request.auth.uid == userId || get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid);
+    }
+
+    // --- 6. Nudges/Reminders Collection ---
+    match /nudges/{nudgeId} {
+      allow read: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.id == nudgeId
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.senderName is string
+        && request.resource.data.recipientId is string && request.resource.data.recipientId != request.auth.uid
+        && request.resource.data.groupId is string
+        && request.resource.data.groupName is string
+        && request.resource.data.targetName is string
+        && request.resource.data.timestamp is string
+        && request.resource.data.isRead == false;
+      allow update: if isSignedIn()
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.isRead == true
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.recipientId == resource.data.recipientId
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.targetName == resource.data.targetName
+        && request.resource.data.timestamp == resource.data.timestamp;
+      allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+    }
+  }
+}

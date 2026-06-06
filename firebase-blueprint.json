@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about a registered user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique identifier for the user corresponding to Auth UID" },
+        "name": { "type": "string", "description": "User's display name" },
+        "email": { "type": "string", "description": "User's sign-in email address" },
+        "joinedAt": { "type": "string", "format": "date-time", "description": "When the account was created" },
+        "currentGroupId": { "type": "string", "description": "Optional active group ID" },
+        "joinedGroupIds": { "type": "array", "description": "Optional array of group IDs the user has joined" }
+      },
+      "required": ["userId", "name", "email", "joinedAt"]
+    },
+    "Target": {
+      "title": "Worship Target",
+      "description": "Worship goals set by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique target ID" },
+        "userId": { "type": "string", "description": "Owner of this target" },
+        "name": { "type": "string", "description": "Target activity name (e.g. Shalat 5 Waktu, Tilawah)" },
+        "metric": { "type": "string", "description": "Measurement unit (e.g. rakaat, lembar, halaman, rupiah)" },
+        "targetValue": { "type": "number", "description": "Goal target value to achieve per period" },
+        "frequency": { "type": "string", "enum": ["daily", "weekly"], "description": "Target frequency" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Date of creation" }
+      },
+      "required": ["id", "userId", "name", "metric", "targetValue", "frequency", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "Worship Activity Log",
+      "description": "Worship progression logs recorded periodically",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique activity log ID" },
+        "userId": { "type": "string", "description": "User who logged this ibadah" },
+        "targetId": { "type": "string", "description": "Reference to the Target configuration" },
+        "targetName": { "type": "string", "description": "Historical copy of the target name" },
+        "date": { "type": "string", "format": "date", "description": "Date in YYYY-MM-DD format" },
+        "value": { "type": "number", "description": "Achieved amount" },
+        "targetValue": { "type": "number", "description": "Target amount to perform" },
+        "metric": { "type": "string", "description": "Measurement unit" },
+        "completed": { "type": "boolean", "description": "Whether the target was fully completed" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the progress was synced" }
+      },
+      "required": ["id", "userId", "targetId", "targetName", "date", "value", "targetValue", "metric", "completed", "updatedAt"]
+    },
+    "Group": {
+      "title": "Worship Group",
+      "description": "Collaborative group for monitoring mutual worship targets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique group ID" },
+        "name": { "type": "string", "description": "Name of the ibadah group" },
+        "code": { "type": "string", "description": "Unique numeric or alphanumeric join code" },
+        "description": { "type": "string", "description": "Brief description of group rules and goals" },
+        "createdBy": { "type": "string", "description": "UID of the user who created it" },
+        "creatorName": { "type": "string", "description": "Display name of the group creator" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Group creation date-time" }
+      },
+      "required": ["id", "name", "code", "description", "createdBy", "creatorName", "createdAt"]
+    },
+    "GroupMember": {
+      "title": "Group Member Info",
+      "description": "Explicit member representation under a group subcollection",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User UID who belongs to the group" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "joinedAt": { "type": "string", "format": "date-time", "description": "When the user joined the group" }
+      },
+      "required": ["userId", "name", "joinedAt"]
+    },
+    "Nudge": {
+      "title": "Nudge Reminder",
+      "description": "Real-time nudge sent inside a group to remind someone",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique nudge ID" },
+        "groupId": { "type": "string", "description": "Group wherein reference occurred" },
+        "groupName": { "type": "string", "description": "Visual group name copy" },
+        "senderId": { "type": "string", "description": "User UID who nudged/reminded" },
+        "senderName": { "type": "string", "description": "Name of user who sent the nudge" },
+        "recipientId": { "type": "string", "description": "Recipient user UID" },
+        "targetName": { "type": "string", "description": "Worship activity Name they are reminded of (e.g. Tilawah)" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Nudge creation date" },
+        "isRead": { "type": "boolean", "description": "Whether recipient has read the notification" }
+      },
+      "required": ["id", "groupId", "groupName", "senderId", "senderName", "recipientId", "targetName", "timestamp", "isRead"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile records"
+    },
+    "/users/{userId}/targets/{targetId}": {
+      "schema": "Target",
+      "description": "Target settings specific to the user"
+    },
+    "/users/{userId}/activities/{activityId}": {
+      "schema": "ActivityLog",
+      "description": "Worship history logs"
+    },
+    "/groups/{groupId}": {
+      "schema": "Group",
+      "description": "Worship groups index"
+    },
+    "/groups/{groupId}/members/{userId}": {
+      "schema": "GroupMember",
+      "description": "Members of each worship group"
+    },
+    "/nudges/{nudgeId}": {
+      "schema": "Nudge",
+      "description": "Real-time notifications trigger queue"
+    }
+  }
+}

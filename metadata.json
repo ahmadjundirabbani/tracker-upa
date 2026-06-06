@@ -1,0 +1,6 @@
+{
+  "name": "Tracker Ibadah Kelompok",
+  "description": "Aplikasi pelacak ibadah real-time harian dan mingguan secara personal atau bersama grup kelompok, lengkap dengan progress-sharing, cubitan pengingat (nudge), grafik riwayat periodik, serta analisis laporan berbasis AI (Gemini).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
